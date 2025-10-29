@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model bookings {
+  id                                                Int        @id @default(autoincrement())
+  user_id                                           String?    @db.Uuid
+  vehicle_id                                        Int?
+  start_datetime                                    DateTime   @db.Timestamp(6)
+  end_datetime                                      DateTime   @db.Timestamp(6)
+  pickup_location_id                                Int?
+  dropoff_location_id                               Int?
+  total_price                                       Decimal?   @db.Decimal(10, 2)
+  surcharge_amount                                  Decimal?   @default(0) @db.Decimal(10, 2) //bo sung
+  status                                            String?    @default("pending") @db.VarChar(20)
+  created_at                                        DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at                                        DateTime?  @default(now()) @db.Timestamp(6)
+  confirmed_by                                      String?    @db.Uuid
+  confirmed_at                                      DateTime?  @default(now()) @db.Timestamp(6)
+  locations_bookings_dropoff_location_idTolocations locations? @relation("bookings_dropoff_location_idTolocations", fields: [dropoff_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  locations_bookings_pickup_location_idTolocations  locations? @relation("bookings_pickup_location_idTolocations", fields: [pickup_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                                             users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vehicles                                          vehicles?  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payments                                          payments[]
+  reviews                                           reviews[]
+  invoices                                          invoices[]
+
+}
+
+model invoices {
+  id             Int        @id @default(autoincrement())
+  invoice_number String     @unique @db.VarChar(50)
+  booking_id     Int
+  payment_id     Int?
+  user_id        String?    @db.Uuid
+  amount         Decimal    @db.Decimal(10, 2)
+  tax_rate       Decimal?   @default(0) @db.Decimal(5, 2)
+  total_amount   Decimal?   @db.Decimal(10, 2)
+  issued_at      DateTime   @default(now())
+  issued_by      String?    @db.Uuid
+  notes          String?
+  pdf_url        String?
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
+
+  bookings       bookings   @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  payments       payments?  @relation(fields: [payment_id], references: [id], onDelete: SetNull)
+  users          users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction) 
+
+}
+
+model locations {
+  id                                               Int        @id(map: "location_pkey") @default(autoincrement())
+  name                                             String     @db.VarChar(100)
+  address                                          String?
+  lat                                              Decimal?   @db.Decimal(9, 6)
+  lng                                              Decimal?   @db.Decimal(9, 6)
+  bookings_bookings_dropoff_location_idTolocations bookings[] @relation("bookings_dropoff_location_idTolocations")
+  bookings_bookings_pickup_location_idTolocations  bookings[] @relation("bookings_pickup_location_idTolocations")
+  vehicles                                         vehicles[]
+}
+
+model logs {
+  id          Int       @id @default(autoincrement())
+  user_id     String?   @db.Uuid
+  action      String?   @db.VarChar(50)
+  object_type String?   @db.VarChar(50)
+  object_id   String?   @db.VarChar(50)
+  meta        Json?
+  timestamp   DateTime? @default(now()) @db.Timestamp(6)
+  users       users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model payments {
+  id                  Int       @id @default(autoincrement())
+  booking_id          Int?
+  user_id             String?   @db.Uuid
+  provider            String?   @db.VarChar(50)
+  provider_payment_id String?   @db.VarChar(100)
+  amount              Decimal?  @db.Decimal(10, 2)
+  currency            String?   @db.VarChar(10)
+  status              String?   @db.VarChar(20)
+  type                String?   @db.VarChar(20) //bo sung
+  paid_at             DateTime? @db.Timestamp(6)
+  bookings            bookings? @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users               users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  invoices            invoices[] 
+}
+
+model refresh_tokens {
+  id         Int       @id @default(autoincrement())
+  user_id    String?   @db.Uuid
+  token_hash String
+  expires_at DateTime? @db.Timestamp(6)
+  revoked    Boolean?  @default(false)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reviews {
+  id         Int       @id @default(autoincrement())
+  booking_id Int?
+  user_id    String?   @db.Uuid
+  rating     Int?
+  comment    String?
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  bookings   bookings? @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String           @unique @db.VarChar(255)
+  password_hash  String
+  name           String?          @db.VarChar(100)
+  phone          String?          @db.VarChar(15)
+  role           String?          @default("customer") @db.VarChar(10)
+  is_verified    Boolean?         @default(false)
+  created_at     DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at     DateTime?        @default(now()) @db.Timestamp(6)
+  bookings       bookings[]
+  logs           logs[]
+  refresh_tokens refresh_tokens[]
+  reviews        reviews[]
+  invoices       invoices[]
+  payments       payments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model vehicles {
+  id            Int        @id @default(autoincrement())
+  title         String     @db.VarChar(100)
+  brand         String?    @db.VarChar(50)
+  model         String?    @db.VarChar(50)
+  year          Int?
+  plate_number  String     @unique @db.VarChar(20)
+  seats         Int?
+  price_per_day Decimal?   @db.Decimal(10, 2)
+  location_id   Int?
+  status        String?    @default("available") @db.VarChar(20)
+  images        String[]
+  bookings      bookings[]
+  locations     locations? @relation(fields: [location_id], references: [id], onUpdate: NoAction)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @default(now()) @updatedAt 
+}
