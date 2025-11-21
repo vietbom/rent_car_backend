@@ -1,5 +1,5 @@
 import z from "zod";
-
+import { v4 as uuidv4 } from 'uuid';
 export const validateRegisterData = (data: any) => {
     const {email, password, name, phone} = data;
 
@@ -114,46 +114,90 @@ export const validateAccount = (data: any) =>{
 }
 
 export const validateVehicleData = (data: any, isCreate = true) => {
-    const requiredFields = ["title", "plate_number", "year", "seats", "location_id", "price_per_day"];
+  const requiredFields = ["title", "plate_number", "year", "location_id", "vehicle_type_id"];
 
-    if (isCreate) {
+  if (isCreate) {
     for (const field of requiredFields) {
-        if (!data[field]) throw new Error(`Trường ${field} là bắt buộc`);
+      if (!data[field]) throw new Error(`Trường ${field} là bắt buộc`);
     }
-    }
+  }
 
-    const validated = {
-        title: data.title?.trim(),
-        plate_number: data.plate_number?.trim(),
-        year: Number(data.year),
-        seats: Number(data.seats),
-        location_id: Number(data.location_id),
-        price_per_day: Number(data.price_per_day),
-        images: Array.isArray(data.images) ? data.images : [],
-        description: data.description?.trim() || null,
-    };
+  const validated: any = {
+    ...(data.title && { title: data.title.trim() }),
+    ...(data.plate_number && { plate_number: data.plate_number.trim() }),
+    ...(data.brand && { brand: data.brand.trim() }),
+    ...(data.model && { model: data.model.trim() }),
+    ...(data.status && { status: data.status }),
+    
+    keep_images: data.keep_images ? (Array.isArray(data.keep_images) ? data.keep_images : [data.keep_images]) : undefined,
+  };
 
-    if (validated.year < 1980 || validated.year > new Date().getFullYear() + 1) {
-        throw new Error("Năm sản xuất không hợp lệ");
-    }
-    if (validated.seats <= 0) throw new Error("Số ghế phải lớn hơn 0");
-    if (validated.price_per_day <= 0) throw new Error("Giá thuê mỗi ngày phải lớn hơn 0");
+  if (data.year !== undefined) validated.year = Number(data.year);
+  if (data.location_id !== undefined) validated.location_id = Number(data.location_id);
+  if (data.vehicle_type_id !== undefined) validated.vehicle_type_id = Number(data.vehicle_type_id);
 
-    return validated;
+  if (validated.year && (validated.year < 1980 || validated.year > new Date().getFullYear() + 1)) {
+    throw new Error("Năm sản xuất không hợp lệ");
+  }
+  
+  if (validated.location_id && validated.location_id <= 0) throw new Error("ID địa điểm không hợp lệ");
+  if (validated.vehicle_type_id && validated.vehicle_type_id <= 0) throw new Error("ID loại xe không hợp lệ");
+
+  return validated;
 };
 
+export const createVehicleTypeSchema = z.object({
+  name: z.string().min(3, "Tên loại xe tối thiểu 3 ký tự"),
+  seats: z.number().int().positive("Số ghế phải là số nguyên dương"),
+  deposit_amount: z.number().positive("Tiền cọc phải là số dương"),
+});
+
+export const updateVehicleTypeSchema = z.object({
+  name: z.string().min(3, "Tên loại xe tối thiểu 3 ký tự").optional(),
+  seats: z.number().int().positive("Số ghế phải là số nguyên dương").optional(),
+  deposit_amount: z.number().positive("Tiền cọc phải là số dương").optional(),
+});
+
+export const createRentalPackageSchema = z.object({
+  vehicle_type_id: z.number().int().positive("ID loại xe không hợp lệ"),
+  duration_hours: z.number().int().positive("Thời gian thuê (giờ) phải là số nguyên dương"),
+  price: z.number().positive("Giá thuê phải là số dương"),
+});
+
+export const updateRentalPackageSchema = z.object({
+  duration_hours: z.number().int().positive("Thời gian thuê (giờ) phải là số nguyên dương").optional(),
+  price: z.number().positive("Giá thuê phải là số dương").optional(),
+})
+
 export const createBookingSchema = z.object({
-    vehicle_id: z.number().refine(val => !!val, {
-        message: "vehicle_id là bắt buộc",
-    }),
-    start_datetime: z.string().min(1, { message: "start_datetime là bắt buộc" }),
-    end_datetime: z.string().min(1, { message: "end_datetime là bắt buộc" }),
-    pickup_location_id: z.number().refine(val => !!val, {
-        message: "pickup_location_id là bắt buộc",
-    }),
-    dropoff_location_id: z.number().refine(val => !!val, {
-        message: "dropoff_location_id là bắt buộc",
-    }),
+  // Cách viết chuẩn: Gom tin nhắn lỗi vào config
+  vehicle_id: z.number({ 
+    required_error: "vehicle_id là bắt buộc", 
+    invalid_type_error: "vehicle_id phải là số" 
+  }),
+
+  rental_package_id: z.number({ 
+    required_error: "rental_package_id là bắt buộc",
+    invalid_type_error: "rental_package_id phải là số"
+  }),
+
+  start_datetime: z.string({ 
+    required_error: "start_datetime là bắt buộc" 
+  }).min(1, "start_datetime không được để trống"),
+
+  end_datetime: z.string({ 
+    required_error: "end_datetime là bắt buộc" 
+  }).min(1, "end_datetime không được để trống"),
+
+  pickup_location_id: z.number({ 
+    required_error: "pickup_location_id là bắt buộc",
+    invalid_type_error: "pickup_location_id phải là số"
+  }),
+
+  dropoff_location_id: z.number({ 
+    required_error: "dropoff_location_id là bắt buộc",
+    invalid_type_error: "dropoff_location_id phải là số"
+  }),
 });
 
 export const createReviewSchema = z.object({

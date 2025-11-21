@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { cancelBooking, confirmBooking, createBooking, getBookingDetails, getBookings, pickupBooking, returnBooking } from "../services/bookingServices.ts";
+import { cancelBooking, createBooking, extendBookingService, getBookingDetails, getBookings, pickupBooking, returnBookingService } from "../services/bookingServices.ts";
 
 export const createBookingHandler = async (req: Request, res: Response) => {
   try {
@@ -106,105 +106,91 @@ export const cancelBookingHandler = async(req: Request, res: Response) => {
     }
 }
 
-export const confirmBookingHandler = async(req: Request, res: Response) => {
-  try {
-      const bookingIdString = req.params.id;
-
-      if (!bookingIdString) {
-        return res
-          .status(400)
-          .json({ message: "ID booking không hợp lệ (không tìm thấy)" });
-      }
-
-      const bookingId = parseInt(bookingIdString, 10);
-      if (isNaN(bookingId)) {
-        return res.status(400).json({ message: "ID booking không hợp lệ" });
-      }
-      if (isNaN(bookingId)) {
-        return res
-          .status(400)
-          .json({ message: "ID booking không hợp lệ (phải là một số)" });
-      }
-
-      const user = (req as any).user!;
-      const confirmedBooking = await confirmBooking(user, bookingId);
-
-      res.status(200).json({
-        message: "Xác nhận booking thành công",
-        data: confirmedBooking,
-      });
-  } catch (error: any) {
-      if (error.message.includes("Booking không tìm thấy")) {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message.includes("Chỉ có thể xác nhận")) {
-        return res.status(409).json({ message: error.message });
-      }
-      res.status(500).json({ message: error.message || "Lỗi máy chủ" });
-  }
-};
-
 export const pickupBookingHandler = async (req: Request, res: Response) => {
   try {
     const bookingIdString = req.params.id;
-    const { deposit_amount, payment_method } = req.body;
+    const { security_deposit, payment_method } = req.body; 
 
-    if (!bookingIdString) {
-      return res.status(400).json({ message: "Thiếu ID booking" });
-    }
+    if (!bookingIdString) return res.status(400).json({ message: "Thiếu ID booking" });
 
     const bookingId = parseInt(bookingIdString, 10);
-    if (isNaN(bookingId)) {
-      return res.status(400).json({ message: "ID booking không hợp lệ" });
-    }
+    if (isNaN(bookingId)) return res.status(400).json({ message: "ID booking không hợp lệ" });
 
-    if (!deposit_amount || !payment_method) {
-      return res.status(400).json({
-        message: "Thiếu thông tin tiền cọc hoặc phương thức thanh toán",
-      });
-    }
+    if (!security_deposit) return res.status(400).json({ message: "Thiếu thông tin tiền cọc thế chấp xe" });
 
-    const user = (req as any).user!;
+    const user = (req as any).user;
+    
     const result = await pickupBooking(
       user,
       bookingId,
-      Number(deposit_amount),
-      payment_method
+      Number(security_deposit),
+      payment_method || "cash"
     );
 
     return res.status(200).json({
-      message: "✅ Đã xác nhận khách hàng nhận xe thành công",
+      message: "✅ Khách đã nhận xe thành công",
       data: result,
     });
   } catch (error: any) {
-    //console.error("❌ Pickup booking error:", error);
     return res.status(500).json({ message: error.message });
+  }
+};
+
+export const extendBookingHandler = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const { id: bookingIdString } = req.params;
+
+    if (!bookingIdString) return res.status(400).json({ message: "Thiếu ID booking" });
+    const bookingId = parseInt(bookingIdString, 10);
+    if (isNaN(bookingId)) return res.status(400).json({ message: "ID booking không hợp lệ" });
+
+    const updatedBooking = await extendBookingService(user, bookingId);
+
+    return res.status(200).json({
+      message: "✅ Gia hạn thời gian thuê thành công",
+      data: updatedBooking,
+    });
+  } catch (error: any) {
+    // Nếu lỗi do trùng lịch (409 Conflict) hoặc lỗi validation (400 Bad Request)
+    const status = error.message.includes("trùng lịch") ? 409 : 400;
+    return res.status(status).json({ 
+        message: error.message,
+        warning: "Vui lòng trả xe đúng hạn để tránh phát sinh phí phạt vi phạm hợp đồng." 
+    });
   }
 };
 
 export const returnBookingHandler = async (req: Request, res: Response) => {
   try {
     const bookingIdString = req.params.id;
-    const { extra_fee } = req.body; 
+    // Admin nhập thêm phí phát sinh (vệ sinh, trầy xước, xăng xe...)
+    const { cleaning_fee, damage_fee, other_fee, compensation_fee, note } = req.body;
 
-    if (!bookingIdString) {
-      return res.status(400).json({ message: "Thiếu ID booking" });
-    }
+    if (!bookingIdString) return res.status(400).json({ message: "Thiếu ID booking" });
 
     const bookingId = parseInt(bookingIdString, 10);
-    if (isNaN(bookingId)) {
-      return res.status(400).json({ message: "ID booking không hợp lệ" });
-    }
+    if (isNaN(bookingId)) return res.status(400).json({ message: "ID booking không hợp lệ" });
 
-    const user = (req as any).user!;
-    const result = await returnBooking(user, bookingId, Number(extra_fee ?? 0));
+    const user = (req as any).user;
+    
+    const result = await returnBookingService(
+      user, 
+      bookingId, 
+      {
+        cleaning_fee: Number(cleaning_fee || 0),
+        damage_fee: Number(damage_fee || 0),
+        other_fee: Number(other_fee || 0),
+        compensation_fee: Number(compensation_fee || 0),
+        note: note || ""
+      }
+    );
 
     return res.status(200).json({
-      message: "✅ Đã xác nhận khách hàng trả xe thành công",
+      message: "✅ Trả xe và quyết toán thành công",
       data: result,
     });
   } catch (error: any) {
-    // console.error("❌ Return booking error:", error);
     return res.status(500).json({ message: error.message });
   }
 };

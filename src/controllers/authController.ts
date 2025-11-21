@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { createLocationService, getLocationsService, handleForgotPassword, handleResetPassword, loginUser, logoutUser, refreshUserToken, registerUser } from "../services/authServices.ts";
+import { createLocationService, getLocationsService, getProfileService, handleForgotPassword, handleResetPassword, loginUser, logoutUser, refreshUserToken, registerUser } from "../services/authServices.ts";
 import { validateAccount, validateEmail } from "../../utils/validate.ts";
 
 export const registerHandler = async (req: Request, res: Response, next: NextFunction) => {
@@ -20,10 +20,6 @@ export const registerHandler = async (req: Request, res: Response, next: NextFun
 export const loginHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await loginUser(req.body);
-
-    if (req.body.expectedRole && user.role !== req.body.expectedRole) {
-      return res.status(403).json({ message: "Không có quyền truy cập" });
-    }
 
     res.status(200).json({
       status: "success",
@@ -136,6 +132,34 @@ export const getLocationsHandler = async (req: Request, res: Response) => {
     console.error("Lỗi khi lấy danh sách địa điểm:", error);
     return res.status(500).json({
       message: "Lỗi khi lấy danh sách địa điểm",
+      error: error.message,
+    });
+  }
+};
+
+export const getProfileHandler = async (req: Request, res: Response) => {
+  try {
+    // middleware verifyAccessToken đã gán user vào req
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Không tìm thấy thông tin người dùng trong token" });
+    }
+
+    const user = await getProfileService(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    return res.status(200).json({
+      message: "Lấy thông tin cá nhân thành công",
+      data: user,
+    });
+  } catch (error: any) {
+    console.error("Lỗi khi lấy thông tin cá nhân:", error);
+    return res.status(500).json({
+      message: "Lỗi máy chủ khi lấy thông tin cá nhân",
       error: error.message,
     });
   }

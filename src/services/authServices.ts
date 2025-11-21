@@ -42,7 +42,8 @@ export const registerUser = async(data: any) => {
         is_verified: newUser.is_verified,
         created_at: newUser.created_at,
         updated_at: newUser.updated_at,
-        tokens,
+        accessToken: tokens.accessToken,   
+        refreshToken: tokens.refreshToken,
     };
 }
 
@@ -59,18 +60,32 @@ export const loginUser = async(data: any) => {
         throw new Error("Tài khoản không có quyền hạn (role) hợp lệ.");
     }
     
-    const accessTokens = createToken({ id: user.id, role: user.role });
+    await prisma.refresh_tokens.updateMany({
+      where: { user_id: user.id, revoked: false },
+      data: { revoked: true },
+    });
+
+    const { accessToken, refreshToken } = createToken({ id: user.id, role: user.role })
+
+    await prisma.refresh_tokens.create({
+      data: {
+        user_id: user.id,
+        token_hash: bcrypt.hashSync(refreshToken, 10),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 ngày
+      },
+    });
 
     return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phone: user.phone,
-        role: user.role,
-        is_verified: user.is_verified,
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-        accessTokens,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      phone: user.phone,
+      role: user.role,
+      is_verified: user.is_verified,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+      accessToken,
+      refreshToken,
     };
 }
 
@@ -81,14 +96,19 @@ export const refreshUserToken = async (receivedToken: string) => {
   if (!refreshTokenSecret) throw new Error("Lỗi cấu hình server");
 
   try {
-    const decoded = jwt.verify(receivedToken, refreshTokenSecret) as { id: string; role: string };
+    const decoded = jwt.verify(receivedToken, refreshTokenSecret) as {
+      id: string;
+      role: string;
+    };
+
     const userId = decoded.id;
 
     const tokens = await prisma.refresh_tokens.findMany({
       where: { user_id: userId, revoked: false },
     });
 
-    if (tokens.length === 0) throw new Error("Không tìm thấy refresh token hợp lệ");
+    if (tokens.length === 0)
+      throw new Error("Không tìm thấy refresh token hợp lệ");
 
     let matchedToken = null;
     for (const tokenRecord of tokens) {
@@ -99,7 +119,8 @@ export const refreshUserToken = async (receivedToken: string) => {
       }
     }
 
-    if (!matchedToken) throw new Error("Refresh token không hợp lệ hoặc đã bị thu hồi");
+    if (!matchedToken)
+      throw new Error("Refresh token không hợp lệ hoặc đã bị thu hồi");
 
     if (matchedToken.expires_at && matchedToken.expires_at < new Date()) {
       await prisma.refresh_tokens.update({
@@ -109,13 +130,22 @@ export const refreshUserToken = async (receivedToken: string) => {
       throw new Error("Refresh token đã hết hạn");
     }
 
-    const { accessToken, refreshToken: newRefreshToken } = createToken({ id: userId, role: decoded.role });
+    const { accessToken, refreshToken: newRefreshToken } = createToken({
+      id: userId,
+      role: decoded.role,
+    });
+
+    await prisma.refresh_tokens.update({
+      where: { id: matchedToken.id },
+      data: { revoked: true },
+    });
 
     await prisma.refresh_tokens.create({
       data: {
         user_id: userId,
         token_hash: bcrypt.hashSync(newRefreshToken, 10),
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        revoked: false,
       },
     });
 
@@ -232,4 +262,20 @@ export const getLocationsService = async () => {
   });
 
   return locations;
+};
+
+export const getProfileService = async (userId: string) => {
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      created_at: true,
+    },
+  });
+
+  return user;
 };

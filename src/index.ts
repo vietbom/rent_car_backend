@@ -3,10 +3,30 @@ import dotenv from 'dotenv';
 import prisma from './config/db.ts';
 import { connectRedis } from './config/redis.ts';
 import { initMinio } from './config/minio.ts';
-
+import { startBookingCronJob } from './cron/bookingCron.ts';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 dotenv.config();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
+
+startBookingCronJob();
+
+const httpServer = createServer(app);
+export const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // Hoặc điền domain web admin của bạn để bảo mật hơn
+    methods: ["GET", "POST"]
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log(`⚡ Client connected: ${socket.id}`);
+  
+  socket.on("disconnect", () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
+});
 
 const startServer = async () => {
   try {
@@ -18,9 +38,9 @@ const startServer = async () => {
     await initMinio();
     
     // 2. Khởi động máy chủ Express
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running with Socket.io on http://0.0.0.0:${PORT}`);
+    });
     
   } catch (error) {
     console.error('❌ Failed to start server:', error);

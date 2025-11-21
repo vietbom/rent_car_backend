@@ -7,52 +7,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model bookings {
-  id                                                Int        @id @default(autoincrement())
-  user_id                                           String?    @db.Uuid
-  vehicle_id                                        Int?
-  start_datetime                                    DateTime   @db.Timestamp(6)
-  end_datetime                                      DateTime   @db.Timestamp(6)
-  pickup_location_id                                Int?
-  dropoff_location_id                               Int?
-  total_price                                       Decimal?   @db.Decimal(10, 2)
-  surcharge_amount                                  Decimal?   @default(0) @db.Decimal(10, 2) //bo sung
-  status                                            String?    @default("pending") @db.VarChar(20)
-  created_at                                        DateTime?  @default(now()) @db.Timestamp(6)
-  updated_at                                        DateTime?  @default(now()) @db.Timestamp(6)
-  confirmed_by                                      String?    @db.Uuid
-  confirmed_at                                      DateTime?  @default(now()) @db.Timestamp(6)
-  locations_bookings_dropoff_location_idTolocations locations? @relation("bookings_dropoff_location_idTolocations", fields: [dropoff_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  locations_bookings_pickup_location_idTolocations  locations? @relation("bookings_pickup_location_idTolocations", fields: [pickup_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users                                             users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  vehicles                                          vehicles?  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  payments                                          payments[]
-  reviews                                           reviews[]
-  invoices                                          invoices[]
-
+/// Vai trò người dùng
+enum Role {
+  customer
+  admin
 }
 
-model invoices {
-  id             Int        @id @default(autoincrement())
-  invoice_number String     @unique @db.VarChar(50)
-  booking_id     Int
-  payment_id     Int?
-  user_id        String?    @db.Uuid
-  amount         Decimal    @db.Decimal(10, 2)
-  tax_rate       Decimal?   @default(0) @db.Decimal(5, 2)
-  total_amount   Decimal?   @db.Decimal(10, 2)
-  issued_at      DateTime   @default(now())
-  issued_by      String?    @db.Uuid
-  notes          String?
-  pdf_url        String?
-  created_at     DateTime   @default(now())
-  updated_at     DateTime   @updatedAt
+enum VehicleStatus {
+  available         
+  under_maintenance // Đang bảo trì (không thể đặt)
+  rented            
+  decommissioned    // Ngừng hoạt động
+}
 
-  bookings       bookings   @relation(fields: [booking_id], references: [id], onDelete: Cascade)
-  payments       payments?  @relation(fields: [payment_id], references: [id], onDelete: SetNull)
-  users          users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction) 
+enum BookingStatus {
+  pending     
+  confirmed   
+  cancelled   
+  rented   
+  returned   
+  completed   
+  overdue    
+}
 
+/// Loại thanh toán
+enum PaymentType {
+  BOOKING_DEPOSIT // Phí giữ chỗ 500k
+  RENTAL_DEPOSIT  // Tiền cọc (10-15tr)
+  RENTAL_FEE      // Tiền thuê xe (theo gói)
+  SURCHARGE       // Thanh toán các phụ phí (trả muộn, vệ sinh...)
+  REFUND          // Hoàn tiền (cọc hoặc hủy)
+}
+
+/// Trạng thái thanh toán
+enum PaymentStatus {
+  pending
+  successful
+  failed
+}
+
+
+model users {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String           @unique @db.VarChar(255)
+  password_hash  String
+  name           String?          @db.VarChar(100)
+  phone          String?          @db.VarChar(15)
+  role           Role?            @default(customer)
+  is_verified    Boolean?         @default(false)
+  created_at     DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at     DateTime?        @default(now()) @db.Timestamp(6)
+  
+  bookings       bookings[]
+  logs           logs[]
+  refresh_tokens refresh_tokens[]
+  reviews        reviews[]
+  invoices       invoices[]
+  payments       payments[]
 }
 
 model locations {
@@ -61,9 +72,162 @@ model locations {
   address                                          String?
   lat                                              Decimal?   @db.Decimal(9, 6)
   lng                                              Decimal?   @db.Decimal(9, 6)
+  
   bookings_bookings_dropoff_location_idTolocations bookings[] @relation("bookings_dropoff_location_idTolocations")
   bookings_bookings_pickup_location_idTolocations  bookings[] @relation("bookings_pickup_location_idTolocations")
   vehicles                                         vehicles[]
+}
+
+
+/// Lưu các thông tin chung và mức cọc
+model vehicle_types {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique // Ví dụ: "Sedan 4 chỗ", "SUV 7 chỗ"
+  seats          Int      // 4, 5, 7
+  deposit_amount Decimal  @db.Decimal(12, 2) // Mức cọc: 10,000,000
+
+  vehicles       vehicles[]
+  rental_packages rental_packages[]
+}
+
+/// BẢNG: Quản lý các gói giá theo loại xe
+/// Ví dụ: Loại "Sedan 4 chỗ", gói 8h, giá 600k
+model rental_packages {
+  id              Int      @id @default(autoincrement())
+  vehicle_type_id Int      // Liên kết tới loại xe
+  duration_hours  Int      // 8, 12, 24
+  price           Decimal  @db.Decimal(10, 2) 
+
+  vehicle_type    vehicle_types @relation(fields: [vehicle_type_id], references: [id])
+  bookings        bookings[]
+
+  @@unique([vehicle_type_id, duration_hours]) // Đảm bảo mỗi loại xe chỉ có 1 gói 8h
+}
+
+/// BẢNG: Quản lý xe cụ thể
+model vehicles {
+  id              Int           @id @default(autoincrement())
+  vehicle_type_id Int           // Liên kết tới loại xe
+  title           String        @db.VarChar(100)
+  brand           String?       @db.VarChar(50)
+  model           String?       @db.VarChar(50)
+  year            Int?
+  plate_number    String        @unique @db.VarChar(20)
+  location_id     Int?
+  status          VehicleStatus? @default(available) // 'available', 'under_maintenance', 'decommissioned'
+  images          String[]
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @default(now()) @updatedAt
+
+  vehicle_type    vehicle_types @relation(fields: [vehicle_type_id], references: [id])
+  bookings        bookings[]
+  locations       locations?    @relation(fields: [location_id], references: [id], onUpdate: NoAction)
+}
+
+/// BẢNG: Quản lý đơn đặt xe 
+model bookings {
+  id                    Int           @id @default(autoincrement())
+  user_id               String?       @db.Uuid
+  vehicle_id            Int?
+  rental_package_id     Int           // Liên kết tới gói giá (8h, 12h, 24h)
+  pickup_location_id    Int?
+  dropoff_location_id   Int?
+
+  // --- Thời gian theo Hợp đồng ---
+  start_datetime        DateTime      @db.Timestamp(6) // Giờ khách đặt nhận
+  end_datetime          DateTime      @db.Timestamp(6) // Giờ khách đặt trả (có thể đã được gia hạn)
+  original_end_datetime DateTime?     @db.Timestamp(6) // Giờ trả GỐC (nếu null = chưa gia hạn)
+
+  // --- Thời gian Thực tế (check-in/check-out) ---
+  actual_start_datetime DateTime?     @db.Timestamp(6) // Giờ khách nhận xe thực tế
+  actual_end_datetime   DateTime?     @db.Timestamp(6) // Giờ khách trả xe thực tế
+
+  // --- Chi tiết Giá và Phí ---
+  base_price            Decimal       @db.Decimal(10, 2) // Giá gốc từ RentalPackage
+  booking_deposit_paid  Decimal?      @default(0) @db.Decimal(10, 2) // Phí giữ chỗ 500k đã thanh toán
+  rental_deposit_paid   Decimal?      @default(0) @db.Decimal(12, 2) // Tiền cọc 10-15tr đã thanh toán
+  
+  extension_fee         Decimal?      @default(0) @db.Decimal(10, 2) // Phí gia hạn (10% gói)
+  late_fee              Decimal?      @default(0) @db.Decimal(10, 2) // Phí trả muộn (20%, 50%...)
+  cleaning_fee          Decimal?      @default(0) @db.Decimal(10, 2) // Phí vệ sinh
+  compensation_fee      Decimal?      @default(0) @db.Decimal(10, 2) // Phí bồi thường (ảnh hưởng người sau)
+  other_surcharges      Decimal?      @default(0) @db.Decimal(10, 2) // Phụ phí khác
+  
+  total_surcharges      Decimal?      @default(0) @db.Decimal(10, 2) // Tổng các phụ phí
+  total_price           Decimal?      @db.Decimal(10, 2) // base_price + total_surcharges
+  discount_amount       Decimal?      @default(0) @db.Decimal(10, 2) // Giảm 15% nếu giao xe muộn
+  
+  // --- Trạng thái và Xác nhận ---
+  status                BookingStatus? @default(pending)
+  created_at            DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?     @default(now()) @db.Timestamp(6)
+  confirmed_by          String?       @db.Uuid // ID của admin hoặc "system" nếu tự động
+  confirmed_at          DateTime?     @db.Timestamp(6)
+
+  locations_bookings_dropoff_location_idTolocations locations?        @relation("bookings_dropoff_location_idTolocations", fields: [dropoff_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  locations_bookings_pickup_location_idTolocations  locations?        @relation("bookings_pickup_location_idTolocations", fields: [pickup_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                                             users?            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vehicles                                          vehicles?         @relation(fields: [vehicle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rental_package                                    rental_packages   @relation(fields: [rental_package_id], references: [id])
+  payments                                          payments[]
+  reviews                                           reviews[]
+  invoices                                          invoices[]
+}
+
+/// BẢNG: Quản lý thanh toán
+/// Sử dụng Enum cho 'status' và 'type'
+model payments {
+  id                  Int            @id @default(autoincrement())
+  booking_id          Int?
+  user_id             String?        @db.Uuid
+  provider            String?        @db.VarChar(50)      
+  provider_payment_id String?        @db.VarChar(100)   
+  amount              Decimal?       @db.Decimal(12, 2)
+  currency            String?        @default("VND") @db.VarChar(10)
+  status              PaymentStatus? @default(pending)
+  type                PaymentType?   // Loại thanh toán (cọc, thuê, phạt...)
+  paid_at             DateTime?      @db.Timestamp(6)
+
+  bookings            bookings?      @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users               users?         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  invoices            invoices[]
+}
+
+model invoices {
+  id               Int       @id @default(autoincrement())
+  invoice_number   String    @unique @db.VarChar(50)
+  booking_id       Int
+  payment_id       Int?      // Liên kết tới thanh toán tổng cuối cùng (nếu có)
+  user_id          String?   @db.Uuid
+  
+  base_amount      Decimal   @db.Decimal(10, 2) // Tiền thuê gốc
+  surcharges_amount Decimal? @default(0) @db.Decimal(10, 2) // Tổng phụ phí
+  tax_rate         Decimal?  @default(0.08) @db.Decimal(5, 2) // 8% VAT
+  tax_amount       Decimal?  @db.Decimal(10, 2) // Tiền thuế
+  total_amount     Decimal?  @db.Decimal(10, 2) // Tổng (base + surcharges + tax)
+  
+  issued_at        DateTime  @default(now())
+  issued_by        String?   @db.Uuid // Admin
+  notes            String?
+  pdf_url          String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  bookings         bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  payments         payments? @relation(fields: [payment_id], references: [id], onDelete: SetNull)
+  users            users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model reviews {
+  id         Int       @id @default(autoincrement())
+  booking_id Int?
+  user_id    String?   @db.Uuid
+  rating     Int?
+  comment    String?
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  
+  bookings   bookings? @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model logs {
@@ -74,23 +238,8 @@ model logs {
   object_id   String?   @db.VarChar(50)
   meta        Json?
   timestamp   DateTime? @default(now()) @db.Timestamp(6)
+  
   users       users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-}
-
-model payments {
-  id                  Int       @id @default(autoincrement())
-  booking_id          Int?
-  user_id             String?   @db.Uuid
-  provider            String?   @db.VarChar(50)
-  provider_payment_id String?   @db.VarChar(100)
-  amount              Decimal?  @db.Decimal(10, 2)
-  currency            String?   @db.VarChar(10)
-  status              String?   @db.VarChar(20)
-  type                String?   @db.VarChar(20) //bo sung
-  paid_at             DateTime? @db.Timestamp(6)
-  bookings            bookings? @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users               users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  invoices            invoices[] 
 }
 
 model refresh_tokens {
@@ -99,55 +248,6 @@ model refresh_tokens {
   token_hash String
   expires_at DateTime? @db.Timestamp(6)
   revoked    Boolean?  @default(false)
+  
   users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model reviews {
-  id         Int       @id @default(autoincrement())
-  booking_id Int?
-  user_id    String?   @db.Uuid
-  rating     Int?
-  comment    String?
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  bookings   bookings? @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model users {
-  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email          String           @unique @db.VarChar(255)
-  password_hash  String
-  name           String?          @db.VarChar(100)
-  phone          String?          @db.VarChar(15)
-  role           String?          @default("customer") @db.VarChar(10)
-  is_verified    Boolean?         @default(false)
-  created_at     DateTime?        @default(now()) @db.Timestamp(6)
-  updated_at     DateTime?        @default(now()) @db.Timestamp(6)
-  bookings       bookings[]
-  logs           logs[]
-  refresh_tokens refresh_tokens[]
-  reviews        reviews[]
-  invoices       invoices[]
-  payments       payments[]
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model vehicles {
-  id            Int        @id @default(autoincrement())
-  title         String     @db.VarChar(100)
-  brand         String?    @db.VarChar(50)
-  model         String?    @db.VarChar(50)
-  year          Int?
-  plate_number  String     @unique @db.VarChar(20)
-  seats         Int?
-  price_per_day Decimal?   @db.Decimal(10, 2)
-  location_id   Int?
-  status        String?    @default("available") @db.VarChar(20)
-  images        String[]
-  bookings      bookings[]
-  locations     locations? @relation(fields: [location_id], references: [id], onUpdate: NoAction)
-  created_at    DateTime   @default(now())
-  updated_at    DateTime   @default(now()) @updatedAt 
 }
