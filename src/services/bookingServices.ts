@@ -64,6 +64,19 @@ export const createBooking = async (userId: string, data: any) => {
   }
 
   return prisma.$transaction(async (tx) => {
+    const activeUserBooking = await tx.bookings.findFirst({
+      where: {
+        user_id: userId,
+        status: { in: ["pending", "confirmed", "rented"] }, 
+      },
+    });
+
+    if (activeUserBooking) {
+      const statusText = activeUserBooking.status === 'pending' ? 'chờ thanh toán cọc' 
+        : activeUserBooking.status === 'rented' ? 'đang đi' 
+        : 'chờ nhận xe';
+      throw new Error(`Bạn đang có một chuyến đi ${statusText}. Vui lòng hoàn tất trước khi đặt xe mới.`);
+    }
     const locationsCount = await tx.locations.count({
         where: { id: { in: [pickup_location_id, dropoff_location_id] } }
     });
@@ -383,7 +396,7 @@ export const pickupBooking = async (
   const taxAmount = Math.round(baseRentalAmount * TAX_RATE);  
   const rentalTotalWithTax = Math.round(baseRentalAmount + taxAmount);  
 
-  const remainingRentalFee = rentalTotalWithTax;
+  const remainingRentalFee = rentalTotalWithTax + surchargesAmount;
 
   const now = new Date(); 
   const scheduledStart = new Date(booking.start_datetime);
@@ -422,7 +435,7 @@ export const pickupBooking = async (
                 surcharges_amount: surchargesAmount > 0 ? surchargesAmount : 0, 
                 tax_rate: TAX_RATE,                      
                 tax_amount: taxAmount,
-                total_amount: Math.round(baseRentalAmount + surchargesAmount + taxAmount),
+                total_amount: remainingRentalFee,
                 issued_by: user.id,
                 notes: "Thanh toán phần tiền thuê (bao gồm VAT) khi nhận xe"
             }
@@ -458,6 +471,9 @@ export const pickupBooking = async (
   });
 
   await invalidateBookingCaches(bookingId, booking.user_id);
+
+  notifyAdmin('BOOKING', { id: bookingId }); 
+  notifyAdmin('INVOICE');
 
   return result;
 };
@@ -557,6 +573,7 @@ export const extendBookingService = async (
 export const returnBookingService = async (
   user: { id: string; role: string },
   bookingId: number,
+  actualReturnTime: Date,
   extras: { 
       cleaning_fee: number; 
       damage_fee: number; 
@@ -575,14 +592,16 @@ export const returnBookingService = async (
       throw new Error(`Trạng thái booking không hợp lệ để trả xe (${booking.status})`);
   }
 
-  const now = new Date();
-  const scheduledEnd = new Date(booking.end_datetime); 
+  const scheduledEnd = new Date(booking.end_datetime);
+  if (actualReturnTime < new Date(booking.actual_start_datetime!)) {
+      throw new Error("Giờ trả xe thực tế không thể sớm hơn giờ nhận xe thực tế.");
+  }
   
   let lateFee = 0;
   let lateHours = 0;
   
-  if (now > scheduledEnd) {
-      const diffMs = now.getTime() - scheduledEnd.getTime();
+  if (actualReturnTime > scheduledEnd) {
+      const diffMs = actualReturnTime.getTime() - scheduledEnd.getTime();
       lateHours = diffMs / (1000 * 60 * 60); 
       const packagePrice = Number(booking.base_price); 
       
@@ -604,7 +623,7 @@ export const returnBookingService = async (
           where: {
               vehicle_id: booking.vehicle_id,
               status: { in: ["confirmed", "pending"] },
-              start_datetime: { lt: now }
+              start_datetime: { lt: actualReturnTime }
           }
       });
       if (nextBooking) {
@@ -646,12 +665,14 @@ export const returnBookingService = async (
       amountToCollect = totalLiability - rentalDeposit;
   }
 
+  const totalSurchargesFinal = lateFee + compensationFee + cleaningFee + damageFee + otherFee;
   const transactionResult = await prisma.$transaction(async (tx) => {
+      const now = new Date();
       const updatedBooking = await tx.bookings.update({
           where: { id: bookingId },
           data: {
               status: "completed", 
-              actual_end_datetime: now,
+              actual_end_datetime: actualReturnTime,
               
               late_fee: lateFee,
               compensation_fee: compensationFee,
@@ -659,13 +680,14 @@ export const returnBookingService = async (
               other_surcharges: damageFee + otherFee,
               
               total_surcharges: lateFee + compensationFee + cleaningFee + damageFee + otherFee,
-              total_price: new Decimal(booking.base_price).plus(totalSurcharges),
+              total_price: { increment: totalSurchargesFinal },
               
               updated_at: now,
           }
       });
 
       let finalPayment = null;
+      let createdInvoice = null;
       const invoiceNumber = `INV-RET-${Date.now()}`;
 
       if (amountToRefund > 0) {
@@ -695,7 +717,7 @@ export const returnBookingService = async (
               }
           });
           
-          await tx.invoices.create({
+          createdInvoice = await tx.invoices.create({
               data: {
                   invoice_number: invoiceNumber,
                   booking_id: bookingId,
@@ -711,60 +733,6 @@ export const returnBookingService = async (
               }
           });
       }
-
-        if (finalPayment) {
-          const createdInvoice = await tx.invoices.findFirst({
-            where: { booking_id: bookingId },
-            orderBy: { id: 'desc' }
-          });
-
-          if (createdInvoice) {
-              try {
-                  const pdfData = {
-                      invoice: createdInvoice,
-                      user: { 
-                          name: booking.users?.name ?? 'N/A', 
-                          email: booking.users?.email ?? 'N/A',
-                          phone: booking.users?.phone ?? 'N/A'
-                      },
-                      vehicle: {
-                        title: booking.vehicles?.title ?? 'Xe',
-                        plate_number: booking.vehicles?.plate_number ?? 'N/A',
-                        brand: booking.vehicles?.brand ?? ''
-                      },
-                      booking: {
-                        start_datetime: booking.start_datetime,
-                        end_datetime: booking.end_datetime,
-                        actual_end_datetime: now, // hoặc updatedBooking.actual_end_datetime
-                        late_fee: lateFee,
-                        cleaning_fee: cleaningFee,
-                        compensation_fee: compensationFee,
-                        damage_fee: damageFee,
-                        other_fee: otherFee,
-                        total_surcharges: totalSurcharges
-                      }
-                  };
-                  const pdfBuffer = await generateInvoicePDF(pdfData);
-                  const pdfName = `invoices/${createdInvoice.invoice_number}.pdf`;
-
-                  await minioClient.putObject(
-                    process.env.MINIO_BUCKET_NAME || 'rentcar',
-                    pdfName,
-                    pdfBuffer,
-                    pdfBuffer.length,
-                    { "Content-Type": "application/pdf" }
-                  );
-
-                  await prisma.invoices.update({
-                    where: { id: createdInvoice.id },
-                    data: { pdf_url: pdfName } 
-                  });
-
-              } catch (err) {
-                  console.error("⚠️ Lỗi tạo PDF:", err);
-              }
-          }
-        }
       
       if (booking.vehicle_id) {
           await tx.vehicles.update({
@@ -774,6 +742,8 @@ export const returnBookingService = async (
       }
       
       return { 
+          updatedBooking,
+          createdInvoice,
           warning: conflictWarning,
           financial_breakdown: {
               deposit_held: rentalDeposit,     
@@ -791,7 +761,6 @@ export const returnBookingService = async (
           }
       };
   });
-
 
   await invalidateBookingCaches(bookingId, booking.user_id); 
   await invalidateVehicleCache();

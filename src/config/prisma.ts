@@ -1,4 +1,3 @@
-// Sửa file: config/db.ts (Hoặc file chứa khai báo PrismaClient)
 
 import { PrismaClient } from '@prisma/client';
 import { io } from '../index.ts'; 

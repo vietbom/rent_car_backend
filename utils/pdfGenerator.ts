@@ -9,11 +9,11 @@ const FONT_PATH = path.join(process.cwd(), 'src', 'assets', 'fonts', 'Roboto-Reg
 interface InvoiceData {
   invoice: invoices;
   user: { name: string | null; email: string | null; phone: string | null };
-  vehicle: { title: string; plate_number: string; brand?: string };
+  vehicle: { title: string; plate_number: string; brand?: string | null | undefined };
   booking: {
     start_datetime: Date;
     end_datetime: Date;
-    actual_end_datetime?: Date;
+    actual_end_datetime?: Date | null | undefined;
     late_fee: number;
     cleaning_fee: number;
     compensation_fee: number;

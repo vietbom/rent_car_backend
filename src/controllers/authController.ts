@@ -19,7 +19,8 @@ export const registerHandler = async (req: Request, res: Response, next: NextFun
 
 export const loginHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await loginUser(req.body);
+    const ipAddress = (req as any).ipAddress;
+    const user = await loginUser(req.body, ipAddress);
 
     res.status(200).json({
       status: "success",

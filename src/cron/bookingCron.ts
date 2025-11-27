@@ -1,12 +1,12 @@
 import cron from "node-cron";
 import { PrismaClient } from "@prisma/client";
 import redisClient from "../config/redis.ts";
+import { notifyAdmin } from "../../utils/socket.util.ts";
 
 const prisma = new PrismaClient();
 
 export const startBookingCronJob = () => {
   cron.schedule("* * * * *", async () => {
-    console.log("⏳ [CRON] Đang quét các đơn booking quá hạn 30 phút...");
 
     try {
       const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
@@ -22,8 +22,7 @@ export const startBookingCronJob = () => {
       });
 
       if (expiredBookings.length > 0) {
-        console.log(`🔥 Tìm thấy ${expiredBookings.length} đơn quá hạn. Đang hủy...`);
-
+        console.log(`⚠️ [CRON] Phát hiện ${expiredBookings.length} đơn quá hạn. Đang xử lý...`);
         const idsToCancel = expiredBookings.map((b) => b.id);
 
         await prisma.bookings.updateMany({
@@ -37,8 +36,11 @@ export const startBookingCronJob = () => {
         for (const booking of expiredBookings) {
             await redisClient.del(`booking:detail:${booking.id}`);
         }
-
-        console.log("✅ [CRON] Đã hủy thành công các đơn quá hạn.");
+        notifyAdmin("BOOKING", {
+            action: "auto_cancel",
+            cancelledIds: idsToCancel,
+        });
+        console.log(`✅ [CRON] Đã hủy thành công ${expiredBookings.length} đơn.`);
       }
     } catch (error) {
       console.error("❌ [CRON ERROR] Lỗi khi chạy cron job:", error);

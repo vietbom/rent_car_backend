@@ -165,18 +165,28 @@ export const returnBookingHandler = async (req: Request, res: Response) => {
   try {
     const bookingIdString = req.params.id;
     // Admin nhập thêm phí phát sinh (vệ sinh, trầy xước, xăng xe...)
-    const { cleaning_fee, damage_fee, other_fee, compensation_fee, note } = req.body;
+    const { actual_end_datetime, cleaning_fee, damage_fee, other_fee, compensation_fee, note } = req.body;
 
     if (!bookingIdString) return res.status(400).json({ message: "Thiếu ID booking" });
 
     const bookingId = parseInt(bookingIdString, 10);
     if (isNaN(bookingId)) return res.status(400).json({ message: "ID booking không hợp lệ" });
 
+    if (!actual_end_datetime) { // Bắt buộc phải có giờ trả xe thực tế
+      return res.status(400).json({ message: "Thiếu thời gian trả xe thực tế (actual_end_datetime)" });
+    }
+    
+    const actualReturnTime = new Date(actual_end_datetime);
+    if (isNaN(actualReturnTime.getTime())) {
+      return res.status(400).json({ message: "Thời gian trả xe không hợp lệ (cần định dạng ISO 8601)" });
+    }
+
     const user = (req as any).user;
     
     const result = await returnBookingService(
       user, 
       bookingId, 
+      actualReturnTime,
       {
         cleaning_fee: Number(cleaning_fee || 0),
         damage_fee: Number(damage_fee || 0),

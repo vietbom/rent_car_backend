@@ -6,6 +6,7 @@ import { initMinio } from './config/minio.ts';
 import { startBookingCronJob } from './cron/bookingCron.ts';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import logger from './config/logger.ts';
 
 dotenv.config();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -21,10 +22,10 @@ export const io = new Server(httpServer, {
 });
 
 io.on("connection", (socket) => {
-  console.log(`⚡ Client connected: ${socket.id}`);
+  logger.info(`⚡ Client connected: ${socket.id}`);
   
   socket.on("disconnect", () => {
-    console.log(`Client disconnected: ${socket.id}`);
+    logger.info(`Client disconnected: ${socket.id}`);
   });
 });
 
@@ -32,18 +33,18 @@ const startServer = async () => {
   try {
     // 1. Kết nối DB, Redis, MinIO
     await prisma.$connect();
-    console.log('✅ Connected to PostgreSQL via Prisma');
+    logger.info('✅ Connected to PostgreSQL via Prisma');
     
     await connectRedis();
     await initMinio();
     
     // 2. Khởi động máy chủ Express
     httpServer.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running with Socket.io on http://0.0.0.0:${PORT}`);
+      logger.info(`🚀 Server running with Socket.io on http://0.0.0.0:${PORT}`);
     });
     
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };

@@ -1,0 +1,67 @@
+[2025-11-27 14:55:16] info: ✅ Connected to PostgreSQL via Prisma
+[2025-11-27 14:55:17] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000
+[2025-11-27 14:55:22] info: ⚡ Client connected: X6uxnk4vUjne4WrJAAAB
+[2025-11-27 14:55:27] info: 192.168.210.178 - - [27/Nov/2025:07:55:27 +0000] "GET /metrics HTTP/1.1" 200 8254 "-" "Prometheus/3.7.3"
+[2025-11-27 14:55:42] info: 192.168.210.178 - - [27/Nov/2025:07:55:42 +0000] "GET /metrics HTTP/1.1" 200 9161 "-" "Prometheus/3.7.3"
+[2025-11-27 14:55:57] info: 192.168.210.178 - - [27/Nov/2025:07:55:57 +0000] "GET /metrics HTTP/1.1" 200 9151 "-" "Prometheus/3.7.3"
+[2025-11-27 14:56:12] info: 192.168.210.178 - - [27/Nov/2025:07:56:12 +0000] "GET /metrics HTTP/1.1" 200 9150 "-" "Prometheus/3.7.3"
+[2025-11-27 14:56:27] info: 192.168.210.178 - - [27/Nov/2025:07:56:27 +0000] "GET /metrics HTTP/1.1" 200 9151 "-" "Prometheus/3.7.3"
+[2025-11-27 14:56:42] info: 192.168.210.178 - - [27/Nov/2025:07:56:42 +0000] "GET /metrics HTTP/1.1" 200 9161 "-" "Prometheus/3.7.3"
+[2025-11-27 14:56:57] info: 192.168.210.178 - - [27/Nov/2025:07:56:57 +0000] "GET /metrics HTTP/1.1" 200 10258 "-" "Prometheus/3.7.3"
+[2025-11-27 14:57:12] info: 192.168.210.178 - - [27/Nov/2025:07:57:12 +0000] "GET /metrics HTTP/1.1" 200 10256 "-" "Prometheus/3.7.3"
+[2025-11-27 14:57:27] info: 192.168.210.178 - - [27/Nov/2025:07:57:27 +0000] "GET /metrics HTTP/1.1" 200 10254 "-" "Prometheus/3.7.3"
+[2025-11-27 14:57:42] info: 192.168.210.178 - - [27/Nov/2025:07:57:42 +0000] "GET /metrics HTTP/1.1" 200 10286 "-" "Prometheus/3.7.3"
+[2025-11-27 14:57:57] info: 192.168.210.178 - - [27/Nov/2025:07:57:57 +0000] "GET /metrics HTTP/1.1" 200 10274 "-" "Prometheus/3.7.3"
+[2025-11-27 14:58:12] info: 192.168.210.178 - - [27/Nov/2025:07:58:12 +0000] "GET /metrics HTTP/1.1" 200 10269 "-" "Prometheus/3.7.3"
+[2025-11-27 14:58:27] info: 192.168.210.178 - - [27/Nov/2025:07:58:27 +0000] "GET /metrics HTTP/1.1" 200 10269 "-" "Prometheus/3.7.3"
+[2025-11-27 14:58:42] info: 192.168.210.178 - - [27/Nov/2025:07:58:42 +0000] "GET /metrics HTTP/1.1" 200 10277 "-" "Prometheus/3.7.3"
+[2025-11-27 14:59:23] info: ✅ Connected to PostgreSQL via Prisma
+[2025-11-27 14:59:23] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000
+[2025-11-27 14:59:24] info: ⚡ Client connected: Pg_a_qDWNC5ewcTRAAAB
+[2025-11-27 14:59:27] info: 192.168.210.178 - - [27/Nov/2025:07:59:27 +0000] "GET /metrics HTTP/1.1" 200 8254 "-" "Prometheus/3.7.3"
+[2025-11-27 14:59:42] info: 192.168.210.178 - - [27/Nov/2025:07:59:42 +0000] "GET /metrics HTTP/1.1" 200 9161 "-" "Prometheus/3.7.3"
+[2025-11-27 14:59:57] info: 192.168.210.178 - - [27/Nov/2025:07:59:57 +0000] "GET /metrics HTTP/1.1" 200 9162 "-" "Prometheus/3.7.3"
+[2025-11-27 15:00:52] info: ✅ Connected to PostgreSQL via Prisma
+[2025-11-27 15:00:53] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000
+[2025-11-27 15:00:53] info: ⚡ Client connected: 2eNkg0bm30s9xyDXAAAB
+[2025-11-27 15:00:57] info: 192.168.210.178 - - [27/Nov/2025:08:00:57 +0000] "GET /metrics HTTP/1.1" 200 8257 "-" "Prometheus/3.7.3"
+[2025-11-27 15:01:12] info: 192.168.210.178 - - [27/Nov/2025:08:01:12 +0000] "GET /metrics HTTP/1.1" 200 9147 "-" "Prometheus/3.7.3"
+[2025-11-27 15:01:27] info: 192.168.210.178 - - [27/Nov/2025:08:01:27 +0000] "GET /metrics HTTP/1.1" 200 9162 "-" "Prometheus/3.7.3"
+[2025-11-27 15:01:42] info: 192.168.210.178 - - [27/Nov/2025:08:01:42 +0000] "GET /metrics HTTP/1.1" 200 9148 "-" "Prometheus/3.7.3"
+[2025-11-27 15:01:57] info: 192.168.210.178 - - [27/Nov/2025:08:01:57 +0000] "GET /metrics HTTP/1.1" 200 9151 "-" "Prometheus/3.7.3"
+[2025-11-27 15:02:12] info: 192.168.210.178 - - [27/Nov/2025:08:02:12 +0000] "GET /metrics HTTP/1.1" 200 9150 "-" "Prometheus/3.7.3"
+[2025-11-27 15:02:27] info: 192.168.210.178 - - [27/Nov/2025:08:02:27 +0000] "GET /metrics HTTP/1.1" 200 10257 "-" "Prometheus/3.7.3"
+[2025-11-27 15:02:42] info: 192.168.210.178 - - [27/Nov/2025:08:02:42 +0000] "GET /metrics HTTP/1.1" 200 10258 "-" "Prometheus/3.7.3"
+[2025-11-27 15:02:57] info: 192.168.210.178 - - [27/Nov/2025:08:02:57 +0000] "GET /metrics HTTP/1.1" 200 10275 "-" "Prometheus/3.7.3"
+[2025-11-27 15:03:12] info: 192.168.210.178 - - [27/Nov/2025:08:03:12 +0000] "GET /metrics HTTP/1.1" 200 10276 "-" "Prometheus/3.7.3"
+[2025-11-27 15:03:27] info: 192.168.210.178 - - [27/Nov/2025:08:03:27 +0000] "GET /metrics HTTP/1.1" 200 10285 "-" "Prometheus/3.7.3"
+[2025-11-27 15:03:42] info: 192.168.210.178 - - [27/Nov/2025:08:03:42 +0000] "GET /metrics HTTP/1.1" 200 10289 "-" "Prometheus/3.7.3"
+[2025-11-27 15:03:57] info: 192.168.210.178 - - [27/Nov/2025:08:03:57 +0000] "GET /metrics HTTP/1.1" 200 10292 "-" "Prometheus/3.7.3"
+[2025-11-27 15:04:12] info: 192.168.210.178 - - [27/Nov/2025:08:04:12 +0000] "GET /metrics HTTP/1.1" 200 10288 "-" "Prometheus/3.7.3"
+[2025-11-27 15:04:27] info: 192.168.210.178 - - [27/Nov/2025:08:04:27 +0000] "GET /metrics HTTP/1.1" 200 10278 "-" "Prometheus/3.7.3"
+[2025-11-27 15:04:42] info: 192.168.210.178 - - [27/Nov/2025:08:04:42 +0000] "GET /metrics HTTP/1.1" 200 10287 "-" "Prometheus/3.7.3"
+[2025-11-27 15:04:57] info: 192.168.210.178 - - [27/Nov/2025:08:04:57 +0000] "GET /metrics HTTP/1.1" 200 10269 "-" "Prometheus/3.7.3"
+[2025-11-27 15:05:12] info: 192.168.210.178 - - [27/Nov/2025:08:05:12 +0000] "GET /metrics HTTP/1.1" 200 10264 "-" "Prometheus/3.7.3"
+[2025-11-27 15:05:27] info: 192.168.210.178 - - [27/Nov/2025:08:05:27 +0000] "GET /metrics HTTP/1.1" 200 10283 "-" "Prometheus/3.7.3"
+[2025-11-27 15:05:42] info: 192.168.210.178 - - [27/Nov/2025:08:05:42 +0000] "GET /metrics HTTP/1.1" 200 10274 "-" "Prometheus/3.7.3"
+[2025-11-27 15:06:18] info: ✅ Connected to PostgreSQL via Prisma
+[2025-11-27 15:06:19] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000
+[2025-11-27 15:06:21] info: ⚡ Client connected: 59HIxBp03aSQigDnAAAB
+[2025-11-27 15:07:15] info: 192.168.210.126 - - [27/Nov/2025:08:07:15 +0000] "GET /api/v1/vehicles?page=1&limit=10 HTTP/1.1" 401 36 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:07:16] info: 192.168.210.126 - - [27/Nov/2025:08:07:16 +0000] "GET /api/v1/vehicles?page=2&limit=10 HTTP/1.1" 401 36 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:07:26] info: 192.168.210.126 - - [27/Nov/2025:08:07:26 +0000] "POST /api/v1/admin/refresh HTTP/1.1" 200 502 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:07:27] info: 192.168.210.126 - - [27/Nov/2025:08:07:27 +0000] "POST /api/v1/admin/refresh HTTP/1.1" 200 502 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:07:35] info: 192.168.210.126 - - [27/Nov/2025:08:07:35 +0000] "GET /api/v1/vehicles?page=2&limit=10 HTTP/1.1" 200 4192 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:07:36] info: 192.168.210.126 - - [27/Nov/2025:08:07:36 +0000] "GET /api/v1/vehicles?page=1&limit=10 HTTP/1.1" 200 11512 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:07:39] info: 192.168.210.126 - - [27/Nov/2025:08:07:39 +0000] "POST /api/v1/auth/logout HTTP/1.1" 200 45 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:07:41] info: 192.168.210.126 - - [27/Nov/2025:08:07:41 +0000] "GET /api/v1/bookings?page=1&limit=10 HTTP/1.1" 304 - "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:07:59] info: 192.168.210.126 - - [27/Nov/2025:08:07:59 +0000] "POST /api/v1/auth/login HTTP/1.1" 200 714 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:08:01] info: 192.168.210.126 - - [27/Nov/2025:08:08:01 +0000] "GET /api/v1/bookings?page=1&limit=10 HTTP/1.1" 304 - "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:08:02] info: 192.168.210.126 - - [27/Nov/2025:08:08:02 +0000] "GET /api/v1/auth HTTP/1.1" 304 - "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:08:12] info: 192.168.210.126 - - [27/Nov/2025:08:08:12 +0000] "GET /api/v1/vehicles?page=2&limit=10 HTTP/1.1" 200 4192 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:14:56] info: 192.168.210.126 - - [27/Nov/2025:08:14:56 +0000] "GET /api/v1/vehicles/10 HTTP/1.1" 200 1353 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:15:05] info: 192.168.210.126 - - [27/Nov/2025:08:15:05 +0000] "PUT /api/v1/admin/vehicles/10 HTTP/1.1" 200 483 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 15:15:06] info: 192.168.210.126 - - [27/Nov/2025:08:15:06 +0000] "GET /api/v1/vehicles/10 HTTP/1.1" 200 1358 "http://localhost:51727/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[2025-11-27 16:44:44] info: Client disconnected: 59HIxBp03aSQigDnAAAB
+[2025-11-27 21:33:30] info: ✅ Connected to PostgreSQL via Prisma
+[2025-11-27 21:33:31] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000

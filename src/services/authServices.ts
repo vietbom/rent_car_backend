@@ -5,7 +5,8 @@ import { PrismaClient } from "@prisma/client";
 import { createToken } from "../../utils/generateTokens.ts";
 import crypto from "crypto";
 import redisClient from "../config/redis.ts";
-import { sendEmail } from "../../utils/sendEmail.ts";
+import { sendEmail, sendSecurityAlert } from "../../utils/sendEmail.ts";
+import { ADMIN_FAIL_COUNT_PREFIX, ADMIN_IP_BLOCK_PREFIX, BLOCK_WINDOW_SECONDS, COUNT_WINdOW_SECONDS, MAX_LOGIN_ATTEMPTS } from "../config/constants.ts";
 
 const prisma = new PrismaClient();
 
@@ -47,18 +48,53 @@ export const registerUser = async(data: any) => {
     };
 }
 
-export const loginUser = async(data: any) => {
+const handleFailedLoginAttempt = async (email: string, ipAddress: string) => {
+  const failCountKey = `${ADMIN_FAIL_COUNT_PREFIX}${ipAddress}`;
+  await prisma.logs.create({
+    data: {
+        action: 'LOGIN_FAILURE',
+        object_type: 'Auth',
+        meta: { email: email, ip: ipAddress, message: 'Password/User incorrect' },
+      }
+    });
+    
+    // 1. Tăng bộ đếm thất bại trong Redis
+    const currentCount = await redisClient.incr(failCountKey);
+
+    // 2. Nếu đây là lần đầu trong cửa sổ (5 phút), đặt TTL
+    if (currentCount === 1) {
+        await redisClient.expire(failCountKey, COUNT_WINdOW_SECONDS); // Hết hạn sau 5 phút
+    }
+
+    // 3. Nếu vượt ngưỡng (5 lần), block IP
+    if (currentCount >= MAX_LOGIN_ATTEMPTS) {
+      const blockKey = `${ADMIN_IP_BLOCK_PREFIX}${ipAddress}`;
+      await redisClient.setEx(blockKey, BLOCK_WINDOW_SECONDS, 'BLOCKED');
+      
+
+
+      console.warn(`🚨 [SECURITY ALERT] IP BLOCKED: ${ipAddress} blocked for 15 minutes.`);
+      sendSecurityAlert(ipAddress, currentCount);
+    }
+}
+
+export const loginUser = async(data: any, ipAddress: string) => {
     const {email, password} = validateLoginData(data); 
 
     const user = await prisma.users.findUnique({where: {email}});
     if(!user) throw new Error("Email hoặc mật khẩu không chính xác");
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    if(!isMatch) throw new Error("Email hoặc mật khẩu không chính xác");
+    if(!isMatch){
+      await handleFailedLoginAttempt(email, ipAddress);
+      throw new Error("Email hoặc mật khẩu không chính xác");
+    } 
 
     if (!user.role) {
         throw new Error("Tài khoản không có quyền hạn (role) hợp lệ.");
     }
+    
+    await redisClient.del(`${ADMIN_FAIL_COUNT_PREFIX}${ipAddress}`);
     
     await prisma.refresh_tokens.updateMany({
       where: { user_id: user.id, revoked: false },

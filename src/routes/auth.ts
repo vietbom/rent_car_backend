@@ -2,11 +2,12 @@ import { Router } from "express";
 import { forgotPassword, getLocationsHandler, getProfileHandler, loginHandler, logoutHandler, refreshHandler, registerHandler, resetPassword } from "../controllers/authController.ts";
 import { verifyAccessToken } from "../midleware/authMiddleware.ts";
 import { fetchInvoiceById } from "../controllers/paymentController.ts";
+import { checkIPBloclk } from "../midleware/securityMiddleware.ts";
 
 const authRouter = Router();
 
 authRouter.post('/register', registerHandler)
-authRouter.post('/login', loginHandler)
+authRouter.post('/login',checkIPBloclk, loginHandler)
 authRouter.post('/refresh', refreshHandler)
 authRouter.post('/logout', verifyAccessToken, logoutHandler)
 
