@@ -22,3 +22,4 @@ export const prometheusMiddleware = (req: Request, res: Response, next: NextFunc
 
   next();
 };
+

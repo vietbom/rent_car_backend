@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:14
+    container_name: my_postgres
+    environment:
+      # Tự động tạo user và db khớp với DATABASE_URL của bạn
+      POSTGRES_USER: ducviet
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # 2. Redis
+  redis:
+    image: redis:alpine
+    container_name: my_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # 3. MinIO Object Storage
+  minio:
+    image: minio/minio
+    container_name: my_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_PROMETHEUS_AUTH_TYPE: "public"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  # 4. Node.js Backend
+  backend:
+    build: .
+    container_name: my_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # Đã đổi localhost thành postgres
+      - DATABASE_URL=postgresql://ducviet:123456@postgres:5432/mydb?schema=public&connection_limit=50
+      
+      # Đã đổi localhost thành redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      
+      # Đã đổi 192.168.10.128 thành minio
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=rentcar
+      
+      # Các biến môi trường khác giữ nguyên
+      - JWT_ACCESS_SECRET=rentcarapp@kma
+      - JWT_REFRESH_SECRET=refeshToken@kma19
+      - MAIL_HOST=sandbox.smtp.mailtrap.io
+      - MAIL_PORT=2525
+      - MAIL_USER=e3210c63812951
+      - MAIL_PASS=2aebf7cf918585
+      - ADMIN_EMAIL=admin@rentcar.com
+      - ADMIN_PASSWORD=rentcar@kmaAT19
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  # 5. Postgres Exporter (Giám sát DB mới)
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: my_postgres_exporter
+    environment:
+      # Kết nối thẳng vào container postgres cùng mạng
+      DATA_SOURCE_NAME: "postgresql://ducviet:123456@postgres:5432/mydb?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # 6. Redis Exporter (Giám sát Redis mới)
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: my_redis_exporter
+    command: 
+      - "-redis.addr=redis://redis:6379"
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # 7. Node Exporter (Giám sát tài nguyên máy chủ Ubuntu)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: my_node_exporter
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:

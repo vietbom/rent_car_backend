@@ -53,51 +53,36 @@ export const getEarningsReport = async (startDate: string, endDate: string) => {
 export const getRentedVehiclesReport = async () => {
   const now = new Date();
 
-  const rentedBookings = await prisma.bookings.findMany({
+  const bookings = await prisma.bookings.findMany({
     where: { 
-      status: "rented" // Enum chuẩn: 'rented' (không phải picked_up)
+      // Lấy đa trạng thái để có cái nhìn toàn cảnh (Bỏ qua cancelled/rejected nếu không cần thiết)
+      status: { in: ["pending", "confirmed", "rented"] } 
     }, 
     select: {
-      id: true,
-      start_datetime: true,
-      end_datetime: true, // Đã bao gồm gia hạn
-      original_end_datetime: true,
-      total_price: true,
-      created_at: true,
-      status: true,
-      vehicles: { 
-        select: {
-          id: true,
-          title: true,
-          plate_number: true,
-          vehicle_type: { select: { name: true } }
-        },
-      },
-      users: { 
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          email: true
-        },
-      },
+      id: true, start_datetime: true, end_datetime: true, original_end_datetime: true,
+      total_price: true, created_at: true, status: true,
+      vehicles: { select: { id: true, title: true, plate_number: true, vehicle_type: { select: { name: true } } } },
+      users: { select: { id: true, name: true, phone: true, email: true } },
     },
-    orderBy: { end_datetime: "asc" }, 
+    // Sắp xếp: Đơn đang chạy/sắp tới lên trước, đơn cũ xuống dưới
+    orderBy: [ { status: 'asc' }, { start_datetime: 'asc' } ], 
   });
 
-  const formatted = rentedBookings.map((b) => {
-    const totalPrice = Number(b.total_price ?? 0);
-    const isOverdue = new Date(b.end_datetime) < now; 
+  const formatted = bookings.map((b) => {
+    // Logic Overdue: Chỉ cảnh báo nếu đơn đang active (rented/confirmed) mà quá giờ
+    const isActive = ["rented", "confirmed"].includes(b.status);
+    const isOverdue = isActive && new Date(b.end_datetime) < now;
 
     return {
       bookingId: b.id,
+      status: b.status, // Trả về status để Frontend hiển thị màu sắc (Badge)
       vehicle: {
           title: b.vehicles?.title ?? "N/A",
           plate: b.vehicles?.plate_number ?? "N/A",
           type: b.vehicles?.vehicle_type?.name ?? ""
       },
       customer: {
-          name: b.users?.name ?? "Khách lẻ",
+          name: b.users?.name ?? "Khách vãng lai",
           phone: b.users?.phone ?? "",
           email: b.users?.email
       },
@@ -105,19 +90,14 @@ export const getRentedVehiclesReport = async () => {
           start: b.start_datetime,
           end: b.end_datetime,
           isExtended: !!b.original_end_datetime, 
-          isOverdue: isOverdue, 
+          isOverdue: isOverdue, // Cờ cảnh báo quá hạn
+          timeLeft: isActive ? (new Date(b.end_datetime).getTime() - now.getTime()) / 3.6e6 : 0 // Số giờ còn lại
       },
-      financial: {
-          estimatedTotal: totalPrice
-      }
+      financial: { estimatedTotal: Number(b.total_price ?? 0) }
     };
   });
 
-  return {
-    message: "Danh sách xe đang hoạt động",
-    count: formatted.length,
-    data: formatted,
-  };
+  return { message: "Báo cáo tổng quan hệ thống xe", count: formatted.length, data: formatted };
 };
 
 /**

@@ -8,7 +8,7 @@ import { getPresignedUrl } from "../config/presigned.ts";
 const prisma = new PrismaClient();
 const BUCKET_NAME = "rentcar";
 const CACHE_TTL_LIST = 600;
-
+const CACHE_TTL_URL = 300;
 
 const invalidateVehicleCaches = async (vehicleId?: number) => {
   try {
@@ -278,19 +278,29 @@ export const deleteVehicle = async (id: number) => {
 };
 
 const enrichVehicleWithUrls = async (vehicle: any) => {
-  if (!vehicle) return null;
+    if (!vehicle) return null;
 
-  const imageUrls = await Promise.all(
-    (vehicle.images || []).map(async (fileName: string) => {
-      try {
-        return await getPresignedUrl(fileName);
-      } catch {
-        return null;
-      }
-    })
-  );
+    const imageUrls = await Promise.all(
+        (vehicle.images || []).map(async (fileName: string) => {
+            const cacheKey = `image:presigned:${fileName}`;
+            let cachedUrl = await redisClient.get(cacheKey);
 
-  return { ...vehicle, imageUrls: imageUrls.filter((url) => url) };
+            if (cachedUrl) {
+                return cachedUrl; 
+            }
+
+            try {
+                const url = await getPresignedUrl(fileName); 
+                
+                await redisClient.set(cacheKey, url, 'EX', CACHE_TTL_URL); 
+                return url;
+            } catch {
+                return null;
+            }
+        })
+    );
+
+    return { ...vehicle, imageUrls: imageUrls.filter((url) => url) };
 };
 
 export const getVehicles = async (
@@ -369,16 +379,18 @@ export const getVehicles = async (
 
     if (page === 1 && !searchTerm && role !== "customer") {
       try {
-        await redisClient.setEx(cacheKey, CACHE_TTL_LIST, JSON.stringify(rawDataResult));
+        await redisClient.set(cacheKey, JSON.stringify(rawDataResult), 'EX', CACHE_TTL_LIST);
       } catch (err) { console.error(err); }
     }
   }
 
-  const vehiclesWithUrls = await Promise.all(
-    rawDataResult.data.map(async (vehicle: any) => {
+  const vehiclesData = rawDataResult?.data || [];
+
+const vehiclesWithUrls = await Promise.all(
+    vehiclesData.map(async (vehicle: any) => {
         return await enrichVehicleWithUrls(vehicle);
     })
-  );
+);
 
   return {
       ...rawDataResult,
@@ -411,7 +423,7 @@ export const getVehicleById = async (id: number) => {
 
     if (!vehicleData) throw new Error("Không tìm thấy xe");
 
-    await redisClient.setEx(cacheKey, 60 * 10, JSON.stringify(vehicleData)); 
+    await redisClient.set(cacheKey, JSON.stringify(vehicleData), 'EX', 60 * 10); 
   }
 
   return await enrichVehicleWithUrls(vehicleData);

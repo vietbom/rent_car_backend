@@ -69,10 +69,8 @@ const handleFailedLoginAttempt = async (email: string, ipAddress: string) => {
     // 3. Nếu vượt ngưỡng (5 lần), block IP
     if (currentCount >= MAX_LOGIN_ATTEMPTS) {
       const blockKey = `${ADMIN_IP_BLOCK_PREFIX}${ipAddress}`;
-      await redisClient.setEx(blockKey, BLOCK_WINDOW_SECONDS, 'BLOCKED');
+      await redisClient.setex(blockKey, BLOCK_WINDOW_SECONDS, 'BLOCKED');
       
-
-
       console.warn(`🚨 [SECURITY ALERT] IP BLOCKED: ${ipAddress} blocked for 15 minutes.`);
       sendSecurityAlert(ipAddress, currentCount);
     }

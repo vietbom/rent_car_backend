@@ -38,147 +38,78 @@ const invalidateBookingCaches = async (bookingId?: number, userId?: string) => {
 };
 
 /* -------------------- CREATE BOOKING SERVICE -------------------- */
-
 export const createBooking = async (userId: string, data: any) => {
-  const {vehicle_id, rental_package_id, start_datetime, end_datetime, pickup_location_id, dropoff_location_id, } = data;
+  const { vehicle_id, rental_package_id, start_datetime, end_datetime, pickup_location_id, dropoff_location_id } = data;
+  const start = new Date(start_datetime), end = new Date(end_datetime), now = new Date();
 
-  const start = new Date(start_datetime);
-  const end = new Date(end_datetime);
-  const now = new Date();
+  // 1. Validate thời gian & Ràng buộc thời gian chờ (Buffer Time)
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) throw new Error("Thời gian không hợp lệ");
+  if (start >= end) throw new Error("Thời gian kết thúc phải sau thời gian bắt đầu");
+  if (start < now) throw new Error("Thời gian nhận xe không thể ở trong quá khứ");
+  if (start.getTime() - now.getTime() < BUFFER_MS) throw new Error(`Vui lòng đặt trước ít nhất ${BUFFER_HOURS} tiếng.`);
 
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-    throw new Error("Thời gian không hợp lệ");
-  }
-  
-  if (start >= end) {
-    throw new Error("Thời gian kết thúc phải sau thời gian bắt đầu");
-  }
-
-  if (start < now) {
-    throw new Error("Thời gian nhận xe không thể ở trong quá khứ");
-  }
-
-  const timeUntilPickup = start.getTime() - now.getTime();
-  if (timeUntilPickup < BUFFER_MS) {
-      throw new Error(`Vui lòng đặt xe trước ít nhất ${BUFFER_HOURS} tiếng để chúng tôi chuẩn bị xe.`);
-  }
-
+  // 2. Transaction đảm bảo tính toàn vẹn dữ liệu (ACID)
   return prisma.$transaction(async (tx) => {
-    const activeUserBooking = await tx.bookings.findFirst({
-      where: {
-        user_id: userId,
-        status: { in: ["pending", "confirmed", "rented"] }, 
-      },
+    // Chặn spam: User đang có đơn (Pending/Confirmed/Rented) thì không được đặt mới
+    const active = await tx.bookings.findFirst({ 
+        where: { user_id: userId, status: { notIn: ["cancelled", "completed"] } } 
     });
+    if (active) throw new Error("Bạn đang có chuyến đi chưa hoàn thành.");
 
-    if (activeUserBooking) {
-      const statusText = activeUserBooking.status === 'pending' ? 'chờ thanh toán cọc' 
-        : activeUserBooking.status === 'rented' ? 'đang đi' 
-        : 'chờ nhận xe';
-      throw new Error(`Bạn đang có một chuyến đi ${statusText}. Vui lòng hoàn tất trước khi đặt xe mới.`);
-    }
-    const locationsCount = await tx.locations.count({
-        where: { id: { in: [pickup_location_id, dropoff_location_id] } }
-    });
-    if (locationsCount < 2) { 
-         if (pickup_location_id === dropoff_location_id) {
-             if (locationsCount < 1) throw new Error("Địa điểm không tồn tại");
-         } else {
-             if (locationsCount < 2) throw new Error("Địa điểm nhận hoặc trả xe không tồn tại");
-         }
+    // Kiểm tra địa điểm (Logic: Điểm nhận/trả phải tồn tại)
+    const locCount = await tx.locations.count({ where: { id: { in: [pickup_location_id, dropoff_location_id] } } });
+    if ((pickup_location_id === dropoff_location_id && locCount < 1) || (pickup_location_id !== dropoff_location_id && locCount < 2)) {
+        throw new Error("Địa điểm không tồn tại.");
     }
 
-    const vehicle = await tx.vehicles.findUnique({
-      where: { id: vehicle_id },
-      include: { vehicle_type: true } 
+    // Kiểm tra Xe và Gói thuê
+    const vehicle = await tx.vehicles.findUnique({ where: { id: vehicle_id }, include: { vehicle_type: true } });
+    if (!vehicle || vehicle.status !== "available") throw new Error("Xe không sẵn sàng.");
+
+    const pack = await tx.rental_packages.findUnique({ where: { id: rental_package_id } });
+    if (!pack || pack.vehicle_type_id !== vehicle.vehicle_type_id) throw new Error("Gói thuê không hợp lệ.");
+
+    // 3. LOGIC CHẶN TRÙNG LỊCH (QUAN TRỌNG NHẤT)
+    const checkStart = new Date(start.getTime() - BUFFER_MS), checkEnd = new Date(end.getTime() + BUFFER_MS);
+    const conflict = await tx.bookings.findFirst({
+      where: { 
+        vehicle_id, 
+        status: { notIn: ["cancelled", "completed"] }, 
+        AND: [{ start_datetime: { lt: checkEnd } }, { end_datetime: { gt: checkStart } }] 
+      }
     });
-
-    if (!vehicle) throw new Error("Xe không tồn tại");
-    if (vehicle.status !== "available") throw new Error("Xe đang bảo trì hoặc không sẵn sàng");
-
-    const rentalPackage = await tx.rental_packages.findUnique({
-        where: { id: rental_package_id }
-    });
-
-    if (!rentalPackage) throw new Error("Gói thuê không tồn tại");
     
-    if (rentalPackage.vehicle_type_id !== vehicle.vehicle_type_id) {
-        throw new Error("Gói thuê không áp dụng cho loại xe này");
+    if (conflict) {
+        const nextFree = new Date(conflict.end_datetime.getTime() + BUFFER_MS);
+        throw new Error(`Xe bận. Vui lòng chọn thời gian sau ${nextFree.toLocaleString('vi-VN')}`);
     }
 
-    const checkStart = new Date(start.getTime() - BUFFER_MS); 
-    const checkEnd = new Date(end.getTime() + BUFFER_MS);
+    // 4. Tính toán chi phí (Pricing Engine)
+    const hoursReal = (end.getTime() - start.getTime()) / 3.6e6;
+    const basePrice = Number(pack.price);
+    let totalPrice = basePrice, totalSurcharges = 0;
 
-    const conflictBooking = await tx.bookings.findFirst({
-      where: {
-        vehicle_id,
-        status: { in: ["confirmed", "rented", "pending"] }, 
-        AND: [
-          { start_datetime: { lt: checkEnd } },    
-          { end_datetime: { gt: checkStart } }     
-        ]
-      },
-    });
-
-    if (conflictBooking) {
-       const conflictEnd = new Date(conflictBooking.end_datetime.getTime() + BUFFER_MS);
-       if (start < conflictEnd && start >= conflictBooking.start_datetime) {
-           throw new Error(`Xe chưa sẵn sàng. Vui lòng chọn thời gian sau ${conflictEnd.toLocaleString('vi-VN')}.`);
-       }
-       throw new Error("Xe đã bị trùng lịch trong khoảng thời gian này.");
-    }
-    
-    const durationMs = end.getTime() - start.getTime();
-    const durationHoursReal = durationMs / (1000 * 60 * 60);
-
-    const packageDuration = rentalPackage.duration_hours; 
-    const basePrice = Number(rentalPackage.price);
-    
-    let totalPrice = basePrice;
-    let totalSurcharges = 0;
-
-    if (durationHoursReal > packageDuration) {
-        const rawExtraHours = durationHoursReal - packageDuration; 
-        const extraHours = Math.ceil(rawExtraHours); 
-        const pricePerHour = basePrice / packageDuration;     
-
-        const surchargeAmount = Math.round(extraHours * pricePerHour); 
-
-        totalSurcharges = surchargeAmount;
-        totalPrice = basePrice + surchargeAmount;
+    // Tính phụ phí vượt giờ (Làm tròn lên)
+    if (hoursReal > pack.duration_hours) {
+        const extraHours = Math.ceil(hoursReal - pack.duration_hours);
+        totalSurcharges = Math.round(extraHours * (basePrice / pack.duration_hours));
+        totalPrice += totalSurcharges;
     }
 
-    const newBooking = await tx.bookings.create({
+    // 5. Lưu Booking & Đồng bộ hệ thống
+    const booking = await tx.bookings.create({
       data: {
-        user_id: userId,
-        vehicle_id,
-        rental_package_id,
-        start_datetime: start,
-        end_datetime: end,
-        pickup_location_id,
-        dropoff_location_id,
-        
-        base_price: basePrice,           
-        total_surcharges: totalSurcharges, 
-        total_price: totalPrice,        
-        
-        booking_deposit_paid: 0,
-        status: "pending",
-        
-        late_fee: 0,
-        cleaning_fee: 0,
-        compensation_fee: 0,
-        other_surcharges: 0,
+        user_id: userId, vehicle_id, rental_package_id, pickup_location_id, dropoff_location_id,
+        start_datetime: start, end_datetime: end, status: "pending", booking_deposit_paid: 0,
+        base_price: basePrice, total_surcharges: totalSurcharges, total_price: totalPrice,
+        late_fee: 0, cleaning_fee: 0, compensation_fee: 0, other_surcharges: 0 
       },
     });
 
-
-    await invalidateVehicleCache();
-    await invalidateBookingCaches(newBooking.id, userId);
-
-    notifyAdmin('BOOKING', { id: newBooking.id });
-
-    return newBooking;
+    // Side effects: Xóa Cache & Bắn Socket
+    await Promise.all([invalidateVehicleCache(), invalidateBookingCaches(booking.id, userId)]);
+    notifyAdmin('BOOKING', { id: booking.id }); 
+    return booking;
   });
 };
 
@@ -252,7 +183,8 @@ export const getBookings = async (
   };
 
   // 5. Set Cache
-  await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(result));
+  //await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(result));
+  await redisClient.set(cacheKey, JSON.stringify(result), "EX", CACHE_TTL);
   return result;
 };
 
@@ -309,7 +241,8 @@ export const getBookingDetails = async (
       (booking.vehicles as any).imageUrls = imageUrls.filter(u => u !== null);
   }
 
-  await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(booking));
+  //await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(booking));
+  await redisClient.set(cacheKey, JSON.stringify(booking), "EX", CACHE_TTL);
   return booking;
 };
 
