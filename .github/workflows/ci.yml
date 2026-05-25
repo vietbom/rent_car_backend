@@ -1,0 +1,57 @@
+name: Rentcar DevSecOps Pipeline
+
+on:
+  push: 
+    branches: ["main", "v1"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  security-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Source Code
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      #SCA (Quét thư viện)
+      - name: SCA - Scan for library vulerabilities (npm audit)
+        run: npm audit --audit-level=high
+
+      #SAST (Quét tĩnh mã nguồn)
+      - name: Cài đặt Semgrep CLI
+        run: pipx install semgrep
+
+      - name: SAST - Quét mã nguồn
+        run: |
+          semgrep scan \
+            --config p/nodejs \
+            --config p/typescript \
+            --config p/security-audit \
+            --error
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build Docker Image
+        run: docker build -t rentcar-backend:test .
+
+      #Container Scanning (Quét Image)
+      - name: Container Scanning
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'rentcar-backend:test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

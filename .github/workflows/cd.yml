@@ -1,0 +1,24 @@
+name: Rentcar CD Pipeline
+
+on:
+  push: 
+    branches: ["main", "v1"]
+
+jobs:
+  sbuild-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Source Code
+        uses: actions/checkout@v3
+
+      - name: Đăng nhập Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Build và Push Docker Image
+        run: |
+          docker build -t ducviet816/rentcar-backend:latest .
+          docker push ducviet816/rentcar-backend:latest

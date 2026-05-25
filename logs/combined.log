@@ -532,3 +532,13 @@
 [2026-05-22 09:19:21] info: ✅ Connected to PostgreSQL via Prisma
 [2026-05-22 09:19:21] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000
 [2026-05-22 09:19:22] info: 192.168.10.1 - - [22/May/2026:09:19:22 +0000] "POST /api/v1/auth/login HTTP/1.1" 200 714 "-" "PostmanRuntime/7.51.0"
+[2026-05-23 02:26:31] info: ✅ Connected to PostgreSQL via Prisma
+[2026-05-23 02:26:31] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000
+[2026-05-23 02:29:00] info: 192.168.10.1 - - [23/May/2026:02:29:00 +0000] "POST /api/v1/auth/login HTTP/1.1" 400 388 "-" "PostmanRuntime/7.53.0"
+[2026-05-23 02:30:05] info: 192.168.10.1 - - [23/May/2026:02:30:05 +0000] "POST /api/v1/auth/login HTTP/1.1" 400 388 "-" "PostmanRuntime/7.53.0"
+[2026-05-23 02:31:55] info: ✅ Connected to PostgreSQL via Prisma
+[2026-05-23 02:31:55] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000
+[2026-05-23 02:32:03] info: 192.168.10.1 - - [23/May/2026:02:32:03 +0000] "POST /api/v1/auth/login HTTP/1.1" 200 714 "-" "PostmanRuntime/7.53.0"
+[2026-05-25 13:53:06] info: ✅ Connected to PostgreSQL via Prisma
+[2026-05-25 13:53:06] info: 🚀 Server running with Socket.io on http://0.0.0.0:3000
+[2026-05-25 14:43:53] info: 192.168.10.1 - - [25/May/2026:14:43:53 +0000] "POST /api/v1/auth/login HTTP/1.1" 200 714 "-" "PostmanRuntime/7.53.0"
