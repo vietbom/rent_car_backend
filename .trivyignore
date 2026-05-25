@@ -1,0 +1,18 @@
+# Bo qua loi cua cross-spawn
+CVE-2024-21538
+
+# Bo qua loi cua glob
+CVE-2025-64756
+
+# Bo qua loi cua minimatch
+CVE-2026-26996
+CVE-2026-27903
+CVE-2026-27904
+
+# Bo qua loi cua tar
+CVE-2026-23745
+CVE-2026-23950
+CVE-2026-24842
+CVE-2026-26960
+CVE-2026-29786
+CVE-2026-31802
